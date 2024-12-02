@@ -15,6 +15,7 @@ import logging
 import json
 import warnings
 import time
+import re
 
 # Suppress oauth warning
 warnings.filterwarnings('ignore', message='file_cache is only supported with oauth2client<4.0.0')
@@ -30,6 +31,24 @@ FOLDER_MAPPINGS = {
     "1FsPM-xB7EH6Fc2CCu67EHDhYMotx0EYc": "/Users/mattobrien/Obsidian Main Vault/ObsidianVault/Oceano/Principals/Dragon/=Dragon & Matt/Transcripts",  # Dragon
     "1EiScFFGiE6hdKBOZeSicnO_lxv2U3mcB": "/Users/mattobrien/Obsidian Main Vault/ObsidianVault/-No Instructions/Daily/Transcripts",  # Meetings
 }
+
+class SyncStats:
+    def __init__(self):
+        self.files_processed = 0
+        self.files_skipped = 0
+        self.errors = 0
+        self.start_time = datetime.now()
+
+    def get_summary(self):
+        duration = datetime.now() - self.start_time
+        return f"""
+Sync Summary:
+------------
+Duration: {duration}
+Files processed: {self.files_processed}
+Files skipped: {self.files_skipped}
+Errors: {self.errors}
+"""
 
 # Create necessary directories
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -52,18 +71,54 @@ error_handler.setLevel(logging.ERROR)
 error_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 logging.getLogger('').addHandler(error_handler)
 
+def parse_date_from_filename(file_name):
+    # Normalize all dashes and add debug logging
+    normalized_name = file_name.replace('–', '-')
+    logging.debug(f"Normalized filename: {normalized_name}")
+
+    # First try format: "- 2024/11/26 12:58 PST -"
+    try:
+        parts = normalized_name.split(' - ')
+        logging.debug(f"Split parts: {parts}")
+        date_str = parts[1].split(' ')[0]
+        logging.debug(f"Extracted date string: {date_str}")
+        return datetime.strptime(date_str, "%Y/%m/%d")
+    except Exception as e:
+        logging.debug(f"First format parse failed: {e}")
+        pass
+
+    # Then try format: "(2024-07-11 15:23 GMT-7)"
+    try:
+        match = re.search(r'\((\d{4}-\d{2}-\d{2})', normalized_name)
+        if match:
+            date_str = match.group(1)
+            logging.debug(f"Regex matched date: {date_str}")
+            return datetime.strptime(date_str, "%Y-%m-%d")
+    except Exception as e:
+        logging.debug(f"Second format parse failed: {e}")
+        pass
+
+    # Try one more format: "– 2024/11/07" (anywhere in string)
+    try:
+        match = re.search(r'[–-]\s*(\d{4}/\d{2}/\d{2})', normalized_name)
+        if match:
+            date_str = match.group(1)
+            logging.debug(f"Third format matched date: {date_str}")
+            return datetime.strptime(date_str, "%Y/%m/%d")
+    except Exception as e:
+        logging.debug(f"Third format parse failed: {e}")
+        pass
+
+    logging.warning(f"Could not parse date from filename: {file_name}")
+    return datetime.now()
+
 def should_process_file(file_id, file_name, processed_files):
     # Skip if in state file
     if file_id in processed_files:
         return False
 
-    # Parse date from filename for new naming convention
-    try:
-        date_str = file_name.split(' - ')[1].split(' ')[0]  # Gets "2024/11/12"
-        date_obj = datetime.strptime(date_str, "%Y/%m/%d")
-        file_date = date_obj.strftime("%Y-%m-%d")
-    except:
-        file_date = datetime.now().strftime("%Y-%m-%d")
+    date_obj = parse_date_from_filename(file_name)
+    file_date = date_obj.strftime("%Y-%m-%d")
 
     # Skip if file already exists in any of the folders
     safe_filename = f"TS. {file_date} - {file_name.replace('/', '-').replace(':', '-')}.md"
@@ -118,15 +173,9 @@ def save_processed_files(processed):
 def create_note_content(original_content, file_name, folder_id):
     timestamp = datetime.now().strftime("%Y-%m-%d %H.%M.%S")
 
-    # Extract date from file name
-    try:
-        date_str = file_name.split(' - ')[1].split(' ')[0]  # Gets "2024/11/12"
-        date_obj = datetime.strptime(date_str, "%Y/%m/%d")
-        daily_note_date = date_obj.strftime("%Y-%m-%d")
-        day_abbr = date_obj.strftime("%a")  # Gets Mon, Tue, etc.
-    except:
-        daily_note_date = datetime.now().strftime("%Y-%m-%d")
-        day_abbr = datetime.now().strftime("%a")
+    date_obj = parse_date_from_filename(file_name)
+    daily_note_date = date_obj.strftime("%Y-%m-%d")
+    day_abbr = date_obj.strftime("%a")
 
     # Different related notes based on folder
     if folder_id == "1FsPM-xB7EH6Fc2CCu67EHDhYMotx0EYc":  # Dragon
@@ -150,6 +199,7 @@ def create_note_content(original_content, file_name, folder_id):
     return header + original_content
 
 def main():
+    stats = SyncStats()
     try:
         logging.info("Starting transcript sync")
         processed_files = load_processed_files()
@@ -169,8 +219,7 @@ def main():
             results = service.files().list(
                 q=query,
                 orderBy='createdTime desc',
-                fields="files(id, name, mimeType)",
-                pageSize=3
+                fields="files(id, name, mimeType)"
             ).execute()
 
             files = results.get('files', [])
@@ -182,30 +231,37 @@ def main():
             logging.info(f'Found {len(files)} transcripts in folder {folder_id}')
             for file in files:
                 try:
-                    file_id = file['id']
-
-                    if not should_process_file(file_id, file['name'], processed_files):
-                        logging.info(f"Skipping file: {file['name']}")
+                    if not file or 'id' not in file or 'name' not in file:
+                        logging.error("Invalid file object received from API")
+                        stats.errors += 1
                         continue
 
-                    logging.info(f"Processing new file: {file['name']}")
+                    file_id = file.get('id')
+                    file_name = file.get('name')
 
-                    # Parse date from filename for new naming convention
-                    try:
-                        date_str = file['name'].split(' - ')[1].split(' ')[0]  # Gets "2024/11/12"
-                        date_obj = datetime.strptime(date_str, "%Y/%m/%d")
-                        file_date = date_obj.strftime("%Y-%m-%d")
-                    except:
-                        file_date = datetime.now().strftime("%Y-%m-%d")
+                    if not file_id or not file_name:
+                        logging.error("Missing required file attributes")
+                        stats.errors += 1
+                        continue
+
+                    if not should_process_file(file_id, file_name, processed_files):
+                        logging.info(f"Skipping file: {file_name}")
+                        stats.files_skipped += 1
+                        continue
+
+                    logging.info(f"Processing new file: {file_name}")
+
+                    date_obj = parse_date_from_filename(file_name)
+                    file_date = date_obj.strftime("%Y-%m-%d")
 
                     # Create safe filename with new format
-                    safe_filename = f"TS. {file_date} - {file['name'].replace('/', '-').replace(':', '-')}.md"
+                    safe_filename = f"TS. {file_date} - {file_name.replace('/', '-').replace(':', '-')}.md"
                     output_path = os.path.join(download_path, safe_filename)
 
                     try:
                         # Download markdown version
                         request = service.files().export_media(
-                            fileId=file['id'],
+                            fileId=file_id,
                             mimeType='text/markdown'
                         )
                         fh = io.BytesIO()
@@ -215,12 +271,13 @@ def main():
                             status, done = downloader.next_chunk()
                             logging.info(f"Download progress: {int(status.progress() * 100)}%")
                     except HttpError as e:
-                        logging.error(f"Google API error processing file {file['name']}: {e}")
+                        logging.error(f"Google API error processing file {file_name}: {e}")
+                        stats.errors += 1
                         continue
 
                     # Get content and add our header
                     content = fh.getvalue().decode('utf-8')
-                    final_content = create_note_content(content, file['name'], folder_id)
+                    final_content = create_note_content(content, file_name, folder_id)
 
                     # Save markdown file
                     with open(output_path, 'wb') as f:
@@ -229,19 +286,23 @@ def main():
                     logging.info(f"Saved to: {output_path}")
 
                     processed_files[file_id] = {
-                        'name': file['name'],
+                        'name': file_name,
                         'processed_at': datetime.now().isoformat()
                     }
                     save_processed_files(processed_files)
+                    stats.files_processed += 1
 
                 except Exception as e:
-                    logging.error(f"Error processing file {file['name']}: {e}")
+                    logging.error(f"Error processing file {file_name}: {e}")
+                    stats.errors += 1
                     continue
 
     except Exception as e:
         logging.error(f"Error in main sync process: {e}", exc_info=True)
+        stats.errors += 1
         # Don't re-raise the error - let the script continue running
 
+    logging.info(stats.get_summary())
     logging.info("Sync completed")
 
 if __name__ == '__main__':

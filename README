@@ -21,21 +21,71 @@ This tool has two parts.
 1. The Google Apps Script watches for new files to be created, and moves them into an appropriate Google Drive folder.
 2. The local business monitors specific Google Drive folders for new transcript files, downloads them, formats them with appropriate frontmatter/context, and saves them to designated folders in an Obsidian vault.
 
-## Current Status
+## Current Status (as of 2024-12-02)
 
 - ✓ Basic functionality working
   - Connects to Google Drive
   - Downloads transcripts
   - Formats for Obsidian
   - Runs as background service
+
 - ✓ Fixed issues
   - State file handling improved with retry logic
   - File existence checks prevent reprocessing
   - Better error handling for API timeouts
+
 - ✓ Multi-folder support added
   - Handles multiple source folders
   - Maps to different destination folders
   - Maintains single state file
+
+- ✓ Smart formatting
+  - Parses dates from filenames
+  - Standardized filename format: `TS. YYYY-MM-DD - ...`
+  - Folder-specific related links:
+    - Customer Calls: Links to user testing pipeline
+    - Dragon: Links to Dragon dashboard
+    - Meetings: Links to daily note for meeting date
+
+- ⚠️ In progress (2024-12-02)
+  - Launchd service returning error code 2
+  - Need to debug service startup issues
+
+## Planned Improvements
+
+1. Current Issues
+   - Fix launchd service (exit status 2)
+   - Add stats for current run (processed, skipped, errors)
+   - Better network timeout handling
+   - Make header template configurable
+   - Fix "None is not subscriptable" warning
+
+2. User Interface Options
+   - Current: Terminal commands for status and control
+   - Potential: Mac menu bar status indicator
+   - Future: Obsidian plugin version
+     - Show sync status in Obsidian
+     - Configure through Obsidian settings
+
+## Security Notes
+
+The current setup stores Google API credentials unencrypted in the credentials folder. While the service account has limited access (only to explicitly shared folders with read-only permissions), a more secure approach would be:
+
+1. Store credentials in macOS Keychain:
+   ```bash
+   # Install keyring
+   pip install keyring
+
+   # Store credentials
+   security add-generic-password -s "transcript-syncer" -a "google-credentials" -w "$(cat credentials/transcript-syncer-131b6cd620c8.json)"
+   ```
+
+2. Update script to use Keychain instead of file:
+   ```python
+   credentials = get_credentials()  # Instead of from_service_account_file
+   ```
+
+This improvement is planned for a future update.
 
 ## Setup
 
@@ -81,30 +131,13 @@ This tool has two parts.
 transcript-syncer/
 ├── src/
 │   └── transcript_downloader.py  # Main script
+│   └── google_drive_file_mover.js  # Main script
 ├── credentials/           # Google API credentials
 ├── state/                # Tracks processed files
 ├── logs/                # Script logging
 ├── downloads/           # Downloaded transcripts
 └── launchd/             # Service configuration
 ```
-
-## Next Steps
-
-1. Add folder-specific formatting
-   - Customize headers by folder type
-   - Add folder-specific metadata
-   - Support different templates
-
-2. Enhance logging
-   - Better error context
-   - Timestamps in all logs
-   - Processing statistics
-
-3. Consider improvements:
-   - Batch processing
-   - Better error recovery
-   - Rate limit handling
-   - Monitoring/alerts
 
 ## Usage
 
@@ -137,7 +170,7 @@ Google Drive folders and their corresponding local Obsidian paths:
 | Type | Drive Folder ID | Local Path |
 |------|----------------|------------|
 | Customer Calls | 108_9MeB539PK6NVEjgARZuQKfms_PPt0 | /Users/mattobrien/Obsidian Main Vault/ObsidianVault/-No Instructions/User testing/Transcripts |
-| Dragon | 1FsPM-xB7EH6Fc2CCu67EHDhYMotx0EYc | /Users/mattobrien/Obsidian Main Vault/ObsidianVault/Oceano/Principals/Dragon/Transcripts |
+| Dragon | 1FsPM-xB7EH6Fc2CCu67EHDhYMotx0EYc | /Users/mattobrien/Obsidian Main Vault/ObsidianVault/Oceano/Principals/Dragon/=Dragon & Matt/Transcripts |
 | Meetings | 1EiScFFGiE6hdKBOZeSicnO_lxv2U3mcB | /Users/mattobrien/Obsidian Main Vault/ObsidianVault/-No Instructions/Daily/Transcripts |
 
 ## Adding a New Folder
@@ -167,7 +200,7 @@ To add a new folder to be monitored and synced:
    - Move a test transcript to the new folder in Drive
    - Run syncer to verify it downloads to correct location
 
-## Known Behaviors
+## Known Behaviors (as of 2024-12-01, maybe fixed)
 - Files take 20-40 seconds each to process
 - Google Drive API occasionally times out
 - Script overwrites existing files rather than creating duplicates

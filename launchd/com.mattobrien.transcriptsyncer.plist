@@ -7,7 +7,7 @@
     <key>ProgramArguments</key>
     <array>
         <string>/Users/mattobrien/anaconda3/bin/python3</string>
-        <string>/Users/mattobrien/Documents/Projects/transcript-syncer/src/list_files.py</string>
+        <string>/Users/mattobrien/Documents/Projects/transcript-syncer/src/transcript_downloader.py</string>
     </array>
     <key>StartInterval</key>
     <integer>300</integer>
@@ -17,5 +17,14 @@
     <string>/Users/mattobrien/Documents/Projects/transcript-syncer/logs/launchd_err.log</string>
     <key>StandardOutPath</key>
     <string>/Users/mattobrien/Documents/Projects/transcript-syncer/logs/launchd_out.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/mattobrien/anaconda3/bin</string>
+        <key>PYTHONPATH</key>
+        <string>/Users/mattobrien/anaconda3/lib/python3.9/site-packages</string>
+    </dict>
+    <key>WorkingDirectory</key>
+    <string>/Users/mattobrien/Documents/Projects/transcript-syncer</string>
 </dict>
 </plist>
