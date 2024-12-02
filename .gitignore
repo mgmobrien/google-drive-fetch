@@ -1,0 +1,18 @@
+
+# Credentials
+credentials/
+
+# Generated files
+logs/
+state/
+downloads/
+
+# Python
+__pycache__/
+*.py[cod]
+*.class
+.env
+
+# Mac
+.DS_Store
+

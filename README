@@ -1,0 +1,155 @@
+# Transcript Syncer
+
+Automatically downloads Google Meet transcripts from Google Drive and adds them to the appropriate folder of the local Obsidian vault.
+
+Setup:
+1. Ensure Google Drive API credentials are in ../credentials/
+2. Create symbolic link for launchd:
+   ln -s /Users/mattobrien/Documents/Projects/transcript-syncer/launchd/com.mattobrien.transcriptsyncer.plist ~/Library/LaunchAgents/com.mattobrien.transcriptsyncer.plist
+3. Load the launchd job:
+   launchctl load ~/Library/LaunchAgents/com.mattobrien.transcriptsyncer.plist
+
+To stop the service:
+launchctl unload ~/Library/LaunchAgents/com.mattobrien.transcriptsyncer.plist
+
+To check status:
+launchctl list | grep transcriptsyncer
+
+## Overview
+
+This tool has two parts.
+1. The Google Apps Script watches for new files to be created, and moves them into an appropriate Google Drive folder.
+2. The local business monitors specific Google Drive folders for new transcript files, downloads them, formats them with appropriate frontmatter/context, and saves them to designated folders in an Obsidian vault.
+
+## Current Status
+
+- ✓ Basic functionality working
+  - Connects to Google Drive
+  - Downloads transcripts
+  - Formats for Obsidian
+  - Runs as background service
+- ⚠️ Known issues
+  - State file handling needs improvement
+  - Reprocessing files unnecessarily
+  - Some timeouts on Google Drive API calls
+- 🚧 In progress
+  - Improving error handling
+  - Adding file existence checks
+  - Better logging
+
+## Setup
+
+1. Google Cloud Console setup:
+   - Create project
+   - Enable Drive API
+   - Create service account
+   - Download credentials
+   - Share Drive folders with service account
+
+2. Local setup:
+   ```bash
+   # Create project structure
+   mkdir -p transcript-syncer/{src,credentials,state,logs,downloads}
+
+   # Install dependencies
+   pip install google-api-python-client
+
+   # Place credentials file
+   mv service-account.json transcript-syncer/credentials/
+
+   # Create launchd symlink
+   ln -s /path/to/transcript-syncer/launchd/com.mattobrien.transcriptsyncer.plist ~/Library/LaunchAgents/
+   ```
+
+3. Configure launchd service:
+   ```bash
+   launchctl load ~/Library/LaunchAgents/com.mattobrien.transcriptsyncer.plist
+   ```
+
+## How It Works
+
+1. Runs every 5 minutes via launchd
+2. Checks configured Google Drive folders for new transcripts
+3. Downloads as markdown
+4. Adds context/metadata
+5. Saves to appropriate Obsidian folder
+6. Tracks processed files in state file
+
+## Project Structure
+
+```
+transcript-syncer/
+├── src/
+│   └── list_files.py      # Main script
+├── credentials/           # Google API credentials
+├── state/                # Tracks processed files
+├── logs/                # Script logging
+├── downloads/           # Downloaded transcripts
+└── launchd/             # Service configuration
+```
+
+## Next Steps
+
+1. Improve state file handling
+   - More robust JSON parsing
+   - Better error recovery
+   - Backup strategy
+
+2. Add file existence checks
+   - Prevent unnecessary reprocessing
+   - Handle conflicts
+
+3. Enhance logging
+   - Better error context
+   - Timestamps in all logs
+   - Processing statistics
+
+4. Consider improvements:
+   - Batch processing
+   - Better error recovery
+   - Rate limit handling
+   - Monitoring/alerts
+
+## Usage
+
+```bash
+# Start service
+launchctl load ~/Library/LaunchAgents/com.mattobrien.transcriptsyncer.plist
+
+# Stop service
+launchctl unload ~/Library/LaunchAgents/com.mattobrien.transcriptsyncer.plist
+
+# Check status
+launchctl list | grep transcriptsyncer
+
+# View logs
+tail -f ~/Documents/Projects/transcript-syncer/logs/transcript_syncer.log
+```
+
+## Configuration
+
+Key configuration points:
+- Google Drive folder IDs
+- Local paths
+- Update frequency
+- Logging levels
+
+## Folder Structure and IDs
+The script processes transcripts from these Google Drive folders:
+- Customer Calls: "108_9MeB539PK6NVEjgARZuQKfms_PPt0"
+  - Client demos, user interviews, feedback sessions
+- No Instructions: "1EiScFFGiE6hdKBOZeSicnO_lxv2U3mcB"
+  - Internal meetings, planning sessions
+- Dragon: "1FsPM-xB7EH6Fc2CCu67EHDhYMotx0EYc"
+  - Dragon therapy sessions
+
+## Current Priority Issues
+1. State file handling is causing unnecessary reprocessing
+2. Need to add existence checks before processing files
+3. Need better logging with timestamps
+
+## Known Behaviors
+- Files take 20-40 seconds each to process
+- Google Drive API occasionally times out
+- State file sometimes appears corrupted between runs
+- Script overwrites existing files rather than creating duplicates
