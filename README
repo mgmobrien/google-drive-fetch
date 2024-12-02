@@ -28,14 +28,14 @@ This tool has two parts.
   - Downloads transcripts
   - Formats for Obsidian
   - Runs as background service
-- ⚠️ Known issues
-  - State file handling needs improvement
-  - Reprocessing files unnecessarily
-  - Some timeouts on Google Drive API calls
-- 🚧 In progress
-  - Improving error handling
-  - Adding file existence checks
-  - Better logging
+- ✓ Fixed issues
+  - State file handling improved with retry logic
+  - File existence checks prevent reprocessing
+  - Better error handling for API timeouts
+- ✓ Multi-folder support added
+  - Handles multiple source folders
+  - Maps to different destination folders
+  - Maintains single state file
 
 ## Setup
 
@@ -80,7 +80,7 @@ This tool has two parts.
 ```
 transcript-syncer/
 ├── src/
-│   └── list_files.py      # Main script
+│   └── transcript_downloader.py  # Main script
 ├── credentials/           # Google API credentials
 ├── state/                # Tracks processed files
 ├── logs/                # Script logging
@@ -90,21 +90,17 @@ transcript-syncer/
 
 ## Next Steps
 
-1. Improve state file handling
-   - More robust JSON parsing
-   - Better error recovery
-   - Backup strategy
+1. Add folder-specific formatting
+   - Customize headers by folder type
+   - Add folder-specific metadata
+   - Support different templates
 
-2. Add file existence checks
-   - Prevent unnecessary reprocessing
-   - Handle conflicts
-
-3. Enhance logging
+2. Enhance logging
    - Better error context
    - Timestamps in all logs
    - Processing statistics
 
-4. Consider improvements:
+3. Consider improvements:
    - Batch processing
    - Better error recovery
    - Rate limit handling
@@ -134,22 +130,44 @@ Key configuration points:
 - Update frequency
 - Logging levels
 
-## Folder Structure and IDs
-The script processes transcripts from these Google Drive folders:
-- Customer Calls: "108_9MeB539PK6NVEjgARZuQKfms_PPt0"
-  - Client demos, user interviews, feedback sessions
-- No Instructions: "1EiScFFGiE6hdKBOZeSicnO_lxv2U3mcB"
-  - Internal meetings, planning sessions
-- Dragon: "1FsPM-xB7EH6Fc2CCu67EHDhYMotx0EYc"
-  - Dragon therapy sessions
+## Path Mappings
 
-## Current Priority Issues
-1. State file handling is causing unnecessary reprocessing
-2. Need to add existence checks before processing files
-3. Need better logging with timestamps
+Google Drive folders and their corresponding local Obsidian paths:
+
+| Type | Drive Folder ID | Local Path |
+|------|----------------|------------|
+| Customer Calls | 108_9MeB539PK6NVEjgARZuQKfms_PPt0 | /Users/mattobrien/Obsidian Main Vault/ObsidianVault/-No Instructions/User testing/Transcripts |
+| Dragon | 1FsPM-xB7EH6Fc2CCu67EHDhYMotx0EYc | /Users/mattobrien/Obsidian Main Vault/ObsidianVault/Oceano/Principals/Dragon/Transcripts |
+| Meetings | 1EiScFFGiE6hdKBOZeSicnO_lxv2U3mcB | /Users/mattobrien/Obsidian Main Vault/ObsidianVault/-No Instructions/Daily/Transcripts |
+
+## Adding a New Folder
+
+To add a new folder to be monitored and synced:
+
+1. Create new folder in Google Drive
+
+2. Share folder with service account:
+   - Share with: `transcript-syncer-service@transcript-syncer.iam.gserviceaccount.com`
+   - Role: Viewer
+
+3. Update Google Apps Script (`script.js`):
+   - Add new folder ID to constants
+   - Add handling logic in `sortMeetingTranscripts()`
+
+4. Update Python script (`src/transcript_downloader.py`):
+   - Add new folder mapping to `FOLDER_MAPPINGS` dictionary:
+   ```python
+   FOLDER_MAPPINGS = {
+       "NEW_FOLDER_ID": "/path/to/destination/folder",
+       # ... existing mappings ...
+   }
+   ```
+
+5. Test new configuration:
+   - Move a test transcript to the new folder in Drive
+   - Run syncer to verify it downloads to correct location
 
 ## Known Behaviors
 - Files take 20-40 seconds each to process
 - Google Drive API occasionally times out
-- State file sometimes appears corrupted between runs
 - Script overwrites existing files rather than creating duplicates
