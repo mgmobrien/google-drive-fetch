@@ -12,6 +12,7 @@ from googleapiclient.errors import HttpError
 import io
 from datetime import datetime
 import logging
+from logging.handlers import RotatingFileHandler
 import json
 import warnings
 import time
@@ -29,7 +30,7 @@ CREDENTIALS_PATH = f'{BASE_DIR}/credentials/transcript-syncer-131b6cd620c8.json'
 FOLDER_MAPPINGS = {
     "108_9MeB539PK6NVEjgARZuQKfms_PPt0": "/Users/mattobrien/Obsidian Main Vault/ObsidianVault/-No Instructions/User testing/Transcripts",  # Customer Calls
     "1FsPM-xB7EH6Fc2CCu67EHDhYMotx0EYc": "/Users/mattobrien/Obsidian Main Vault/ObsidianVault/Oceano/Principals/Dragon/=Dragon & Matt/Transcripts",  # Dragon
-    "1EiScFFGiE6hdKBOZeSicnO_lxv2U3mcB": "/Users/mattobrien/Obsidian Main Vault/ObsidianVault/-No Instructions/Daily/Transcripts",  # Meetings
+    "1EiScFFGiE6hdKBOZeSicnO_lxv2U3mcB": "/Users/mattobrien/Obsidian Main Vault/ObsidianVault/-No Instructions/Dan Matt/Transcripts",  # Meetings
 }
 
 class SyncStats:
@@ -61,12 +62,20 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
     level=logging.INFO,
     handlers=[
-        logging.FileHandler(os.path.join(LOG_DIR, 'transcript_syncer.log'))
+        RotatingFileHandler(
+            os.path.join(LOG_DIR, 'transcript_syncer.log'),
+            maxBytes=1024*1024,  # 1MB per file
+            backupCount=5        # Keep 5 backup files
+        )
     ]
 )
 
 # Add error-only handler
-error_handler = logging.FileHandler(os.path.join(LOG_DIR, 'launchd_err.log'))
+error_handler = RotatingFileHandler(
+    os.path.join(LOG_DIR, 'launchd_err.log'),
+    maxBytes=1024*1024,
+    backupCount=5
+)
 error_handler.setLevel(logging.ERROR)
 error_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 logging.getLogger('').addHandler(error_handler)
@@ -271,7 +280,10 @@ def main():
                             status, done = downloader.next_chunk()
                             logging.info(f"Download progress: {int(status.progress() * 100)}%")
                     except HttpError as e:
-                        logging.error(f"Google API error processing file {file_name}: {e}")
+                        if "Failed to establish a new connection" in str(e) or "Connection refused" in str(e) or "Unable to find the server" in str(e):
+                            logging.error(f"Network connectivity issue while processing {file_name}: {e}")
+                        else:
+                            logging.error(f"Google API error processing file {file_name}: {e}")
                         stats.errors += 1
                         continue
 
@@ -279,12 +291,17 @@ def main():
                     content = fh.getvalue().decode('utf-8')
                     final_content = create_note_content(content, file_name, folder_id)
 
-                    # Save markdown file
-                    with open(output_path, 'wb') as f:
-                        f.write(final_content.encode('utf-8'))
+                    try:
+                        # Save markdown file
+                        with open(output_path, 'wb') as f:
+                            f.write(final_content.encode('utf-8'))
+                        logging.info(f"Saved to: {output_path}")
+                    except IOError as e:
+                        logging.error(f"Failed to write file {file_name} to {output_path}: {e}")
+                        stats.errors += 1
+                        continue  # Skip state update if write failed
 
-                    logging.info(f"Saved to: {output_path}")
-
+                    # Only update state if write succeeded
                     processed_files[file_id] = {
                         'name': file_name,
                         'processed_at': datetime.now().isoformat()

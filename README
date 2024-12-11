@@ -2,6 +2,11 @@
 
 Automatically downloads Google Meet transcripts from Google Drive and adds them to the appropriate folder of the local Obsidian vault.
 
+This tool has 3 parts:
+1. The Google Apps Script watches for new files to be created, and moves them into an appropriate Google Drive folder.
+2. The local business checks specific Google Drive folders for new transcript files, downloads them, formats them with appropriate frontmatter/context, and saves them to designated folders in an Obsidian vault.
+3. com.mattobrien.transcriptsyncer.plist runs the downloader every 5 mins
+
 Setup:
 1. Ensure Google Drive API credentials are in ../credentials/
 2. Create symbolic link for launchd:
@@ -15,13 +20,8 @@ launchctl unload ~/Library/LaunchAgents/com.mattobrien.transcriptsyncer.plist
 To check status:
 launchctl list | grep transcriptsyncer
 
-## Overview
 
-This tool has two parts.
-1. The Google Apps Script watches for new files to be created, and moves them into an appropriate Google Drive folder.
-2. The local business monitors specific Google Drive folders for new transcript files, downloads them, formats them with appropriate frontmatter/context, and saves them to designated folders in an Obsidian vault.
-
-## Current Status (as of 2024-12-02)
+## Current Status (as of 2024-12-10)
 
 - ✓ Basic functionality working
   - Connects to Google Drive
@@ -47,14 +47,26 @@ This tool has two parts.
     - Dragon: Links to Dragon dashboard
     - Meetings: Links to daily note for meeting date
 
-- ⚠️ In progress (2024-12-02)
-  - Launchd service returning error code 2
-  - Need to debug service startup issues
+- ✓ Service issues resolved
+  - Launchd service now running correctly
+  - Successfully processing new transcripts
+  - Some timeout errors on older files
+
+## Meeting Type Codes
+
+Coming soon: Standardized codes for meeting types to ensure accurate folder sorting.
+
+Planned format:
+- DM: Dragon & Matt meetings
+- CC: Customer Calls
+- ST: Standups
+- etc.
+
+(TODO: Define final code list and update Google Apps Script to match exactly on these codes)
 
 ## Planned Improvements
 
 1. Current Issues
-   - Fix launchd service (exit status 2)
    - Add stats for current run (processed, skipped, errors)
    - Better network timeout handling
    - Make header template configurable
@@ -66,6 +78,12 @@ This tool has two parts.
    - Future: Obsidian plugin version
      - Show sync status in Obsidian
      - Configure through Obsidian settings
+
+3. File Matching Improvements
+   - Define standardized meeting type codes
+   - Update Google Drive script to use exact code matching
+   - Prevent false matches (e.g., "Dragon party" -> Dragon folder)
+   - Document meeting codes in README
 
 ## Security Notes
 
@@ -200,7 +218,7 @@ To add a new folder to be monitored and synced:
    - Move a test transcript to the new folder in Drive
    - Run syncer to verify it downloads to correct location
 
-## Known Behaviors (as of 2024-12-01, maybe fixed)
+## Known Behaviors (as of 2024-12-10)
 - Files take 20-40 seconds each to process
-- Google Drive API occasionally times out
+- Google Drive API occasionally times out on older files
 - Script overwrites existing files rather than creating duplicates
