@@ -28,6 +28,7 @@ STATE_FILE = f'{BASE_DIR}/state/processed_files.json'
 CREDENTIALS_PATH = f'{BASE_DIR}/credentials/transcript-syncer-131b6cd620c8.json'
 
 FOLDER_MAPPINGS = {
+    "1FD_UfXJ1gjOmFrjudnuMfrQ15On2JsMS": "/Users/mattobrien/Obsidian Main Vault/ObsidianVault/Catchall transcripts",  # Catch-all
     "108_9MeB539PK6NVEjgARZuQKfms_PPt0": "/Users/mattobrien/Obsidian Main Vault/ObsidianVault/-No Instructions/User testing/Transcripts",  # Customer Calls
     "1FsPM-xB7EH6Fc2CCu67EHDhYMotx0EYc": "/Users/mattobrien/Obsidian Main Vault/ObsidianVault/Oceano/Principals/Dragon/=Dragon & Matt/Transcripts",  # Dragon
     "1EiScFFGiE6hdKBOZeSicnO_lxv2U3mcB": "/Users/mattobrien/Obsidian Main Vault/ObsidianVault/-No Instructions/Dan Matt/Transcripts",  # Meetings
