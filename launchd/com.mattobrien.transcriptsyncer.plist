@@ -6,25 +6,25 @@
     <string>com.mattobrien.transcriptsyncer</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/mattobrien/anaconda3/bin/python3</string>
-        <string>/Users/mattobrien/Documents/Projects/transcript-syncer/src/transcript_downloader.py</string>
+        <string>/Users/mattobrien/Development/google-drive-fetcher/venv/bin/python3</string>
+        <string>/Users/mattobrien/Development/google-drive-fetcher/src/transcript_downloader.py</string>
     </array>
     <key>StartInterval</key>
     <integer>300</integer>
     <key>RunAtLoad</key>
     <true/>
     <key>StandardErrorPath</key>
-    <string>/Users/mattobrien/Documents/Projects/transcript-syncer/logs/launchd_err.log</string>
+    <string>/Users/mattobrien/Development/google-drive-fetcher/logs/launchd_err.log</string>
     <key>StandardOutPath</key>
-    <string>/Users/mattobrien/Documents/Projects/transcript-syncer/logs/launchd_out.log</string>
+    <string>/Users/mattobrien/Development/google-drive-fetcher/logs/launchd_out.log</string>
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
-        <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/mattobrien/anaconda3/bin</string>
+        <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/mattobrien/Development/google-drive-fetcher/venv/bin</string>
         <key>PYTHONPATH</key>
-        <string>/Users/mattobrien/anaconda3/lib/python3.9/site-packages</string>
+        <string>/Users/mattobrien/Development/google-drive-fetcher/venv/lib/python3.13/site-packages</string>
     </dict>
     <key>WorkingDirectory</key>
-    <string>/Users/mattobrien/Documents/Projects/transcript-syncer</string>
+    <string>/Users/mattobrien/Development/google-drive-fetcher</string>
 </dict>
 </plist>

@@ -22,7 +22,7 @@ import re
 warnings.filterwarnings('ignore', message='file_cache is only supported with oauth2client<4.0.0')
 
 # Set up base directory and paths
-BASE_DIR = '/Users/mattobrien/Documents/Projects/transcript-syncer'
+BASE_DIR = '/Users/mattobrien/Development/google-drive-fetcher'
 LOG_DIR = f'{BASE_DIR}/logs'
 STATE_FILE = f'{BASE_DIR}/state/processed_files.json'
 CREDENTIALS_PATH = f'{BASE_DIR}/credentials/transcript-syncer-131b6cd620c8.json'
