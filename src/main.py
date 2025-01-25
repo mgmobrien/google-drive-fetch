@@ -20,6 +20,7 @@ import re
 import yaml
 from date_parser import parse_date_from_filename
 from state import FileProcessor
+from content import ContentFormatter
 
 # Suppress oauth warning
 warnings.filterwarnings('ignore', message='file_cache is only supported with oauth2client<4.0.0')
@@ -39,6 +40,9 @@ CREDENTIALS_PATH = os.path.join(BASE_DIR, config['credentials']['service_account
 
 # Create file processor
 file_processor = FileProcessor(STATE_FILE)
+
+# Create content formatter
+content_formatter = ContentFormatter()
 
 # Get folder mappings from config
 FOLDER_MAPPINGS = {
@@ -116,34 +120,6 @@ def should_process_file(file_id, file_name, processed_files):
             return False
 
     return True
-
-def create_note_content(original_content, file_name, folder_id):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H.%M.%S")
-
-    date_obj = parse_date_from_filename(file_name)
-    daily_note_date = date_obj.strftime("%Y-%m-%d")
-    day_abbr = date_obj.strftime("%a")
-
-    # Different related notes based on folder
-    if folder_id == "1FsPM-xB7EH6Fc2CCu67EHDhYMotx0EYc":  # Dragon
-        related_notes = "[[Dashboard. Dragon]]"
-    elif folder_id == "1EiScFFGiE6hdKBOZeSicnO_lxv2U3mcB":  # Meetings
-        related_notes = f"[[No {daily_note_date} {day_abbr}]]"
-    else:  # Customer calls
-        related_notes = "[[S3. Establish and maintain user testing pipeline]]"
-
-    header = f'''*Created by [[Transcript Syncer]] at {timestamp}*
-
-> [!-cf-]+ [[Related notes]]
-> - {related_notes}
-
-
-
-
----
-
-'''
-    return header + original_content
 
 def main():
     stats = SyncStats()
@@ -230,7 +206,7 @@ def main():
 
                     # Get content and add our header
                     content = fh.getvalue().decode('utf-8')
-                    final_content = create_note_content(content, file_name, folder_id)
+                    final_content = content_formatter.create_note_content(content, file_name, folder_id)
 
                     try:
                         # Save markdown file
