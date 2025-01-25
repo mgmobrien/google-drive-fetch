@@ -1,0 +1,16 @@
+credentials:
+  service_account_path: "credentials/service-account.json"
+
+folders:
+  catchall:
+    google_drive_id: "1FD_UfXJ1gjOmFrjudnuMfrQ15On2JsMS"
+    local_path: "/path/to/catchall/transcripts"
+  customer_calls:
+    google_drive_id: "108_9MeB539PK6NVEjgARZuQKfms_PPt0"
+    local_path: "/path/to/customer-calls/transcripts"
+  dragon:
+    google_drive_id: "1FsPM-xB7EH6Fc2CCu67EHDhYMotx0EYc"
+    local_path: "/path/to/dragon/transcripts"
+  meetings:
+    google_drive_id: "1EiScFFGiE6hdKBOZeSicnO_lxv2U3mcB"
+    local_path: "/path/to/meetings/transcripts"
