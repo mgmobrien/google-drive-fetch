@@ -2,6 +2,8 @@
 
 Automatically fetches text documents (Google Docs and .md) from Google Drive folders and saves them as markdown files in specified local directories. Built primarily for syncing meeting transcripts to Obsidian vaults.
 
+This project was created by Matt O'Brien ([@mgmobrien](https://github.com/mgmobrien/)) with Claude 3.5 Sonnet in Zed and Obsidian. Claude wrote the code and documentation with Matt's supervision and editing.
+
 ## Features
 
 - One-way sync from Google Drive to local directories
@@ -24,6 +26,31 @@ cd google-drive-fetch
 pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client pyyaml
 ```
 
+## Google Cloud Setup
+
+1. Create a new project in Google Cloud Console:
+   - Go to [Google Cloud Console](https://console.cloud.google.com)
+   - Create a new project or select an existing one
+   - Enable the Google Drive API for your project
+
+2. Create a service account:
+   - Go to IAM & Admin > Service Accounts
+   - Click "Create Service Account"
+   - Name it (e.g., "drive-fetch")
+   - No need to grant project roles
+   - Click "Create and Continue"
+
+3. Create and download credentials:
+   - Select your new service account
+   - Go to "Keys" tab
+   - Add new key > Create new key > JSON
+   - Save the downloaded file as `credentials/service-account.json`
+
+4. Share folders:
+   - In Google Drive, share each folder you want to fetch from
+   - Share with the service account email (found in credentials file)
+   - Only needs "Viewer" access
+
 ## Configuration
 
 1. Copy the example config file:
@@ -31,30 +58,63 @@ pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-pyt
 cp config.example.yaml config.yaml
 ```
 
-2. Set up Google Cloud Project and credentials:
-   - Create a new project in Google Cloud Console
-   - Enable the Google Drive API
-   - Create a service account
-   - Download the service account key
-   - Copy to `credentials/service-account.json`
-
-3. Update `config.yaml` with your folder mappings:
+2. Update `config.yaml` with your folder mappings:
 ```yaml
+credentials:
+  service_account_path: "credentials/service-account.json"
+
 folders:
-  folder_name:
-    google_drive_id: "your-folder-id"
+  transcripts:  # This name is just for you
+    google_drive_id: "1xxx..."  # Folder ID from Google Drive URL
     local_path: "/path/to/local/folder"
+  meeting_notes:
+    google_drive_id: "1yyy..."
+    local_path: "/different/local/path"
 ```
+
+To get a folder's ID:
+1. Open the folder in Google Drive
+2. The ID is in the URL: `https://drive.google.com/drive/folders/THIS_IS_THE_ID`
 
 ## Usage
 
 Run the script:
 ```bash
-python src/transcript_downloader.py
+python src/main.py
 ```
 
-For automated running, set up using your system's scheduler (launchd, cron, etc.)
+For automated running:
+
+### macOS (launchd)
+```bash
+# Copy the plist file
+cp launchd/com.mattobrien.transcriptsyncer.plist ~/Library/LaunchAgents/
+# Edit paths in the plist file to match your setup
+# Load the service
+launchctl load ~/Library/LaunchAgents/com.mattobrien.transcriptsyncer.plist
+```
+
+### Linux (cron)
+```bash
+# Add to crontab (runs every 5 minutes)
+*/5 * * * * cd /path/to/google-drive-fetch && ./venv/bin/python src/main.py
+```
+
+## Logs
+
+Logs are written to:
+- `logs/transcript_syncer.log` - All activity
+- `logs/launchd_err.log` - Errors only
 
 ## License
 
+All code was written by Claude 3.5 Sonnet with
+
 MIT
+
+## Contributing
+
+Pull requests welcome! Some areas that could use improvement:
+- Support for other document sources (Zoom, Otter, etc.)
+- More flexible date parsing
+- Additional front matter templates
