@@ -8,70 +8,28 @@ import os
 from datetime import datetime
 import logging
 from logging.handlers import RotatingFileHandler
-import json
 import warnings
-import time
-import re
-import yaml
 from date_parser import parse_date_from_filename
 from state import FileProcessor
 from content import ContentFormatter
 from drive import DriveClient
+from config import Config
+from stats import FetchStats
 
 # Suppress oauth warning
 warnings.filterwarnings('ignore', message='file_cache is only supported with oauth2client<4.0.0')
 
-# Load config
-try:
-    with open('config.yaml', 'r') as f:
-        config = yaml.safe_load(f)
-except FileNotFoundError:
-    raise FileNotFoundError("config.yaml not found. Please copy config.example.yaml to config.yaml and update with your settings.")
-
-# Set up base directory and paths
+# Set up base directory and initialize config
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-LOG_DIR = os.path.join(BASE_DIR, 'logs')
-STATE_FILE = os.path.join(BASE_DIR, 'state', 'processed_files.json')
-CREDENTIALS_PATH = os.path.join(BASE_DIR, config['credentials']['service_account_path'])
-
-# Create file processor
-file_processor = FileProcessor(STATE_FILE)
-
-# Create content formatter
-content_formatter = ContentFormatter()
-
-# Create drive client
-drive_client = DriveClient(CREDENTIALS_PATH)
-
-# Get folder mappings from config
-FOLDER_MAPPINGS = {
-    folder_config['google_drive_id']: folder_config['local_path']
-    for folder_config in config['folders'].values()
-}
-
-class SyncStats:
-    def __init__(self):
-        self.files_processed = 0
-        self.files_skipped = 0
-        self.errors = 0
-        self.start_time = datetime.now()
-
-    def get_summary(self):
-        duration = datetime.now() - self.start_time
-        return f"""
-Sync Summary:
-------------
-Duration: {duration}
-Files processed: {self.files_processed}
-Files skipped: {self.files_skipped}
-Errors: {self.errors}
-"""
+config = Config(BASE_DIR)
 
 # Create necessary directories
-os.makedirs(LOG_DIR, exist_ok=True)
-os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
-for path in FOLDER_MAPPINGS.values():
-    os.makedirs(path, exist_ok=True)
+config.create_directories()
+
+# Initialize components with config
+file_processor = FileProcessor(config.state_file)
+content_formatter = ContentFormatter()
+drive_client = DriveClient(config.credentials_path)
 
 # Set up logging
 logging.basicConfig(
@@ -79,7 +37,7 @@ logging.basicConfig(
     level=logging.INFO,
     handlers=[
         RotatingFileHandler(
-            os.path.join(LOG_DIR, 'transcript_syncer.log'),
+            os.path.join(config.log_dir, 'transcript_syncer.log'),
             maxBytes=1024*1024,  # 1MB per file
             backupCount=5        # Keep 5 backup files
         )
@@ -88,7 +46,7 @@ logging.basicConfig(
 
 # Add error-only handler
 error_handler = RotatingFileHandler(
-    os.path.join(LOG_DIR, 'launchd_err.log'),
+    os.path.join(config.log_dir, 'launchd_err.log'),
     maxBytes=1024*1024,
     backupCount=5
 )
@@ -106,7 +64,7 @@ def should_process_file(file_id, file_name, processed_files):
 
     # Skip if file already exists in any of the folders
     safe_filename = f"TS. {file_date} - {file_name.replace('/', '-').replace(':', '-')}.md"
-    for path in FOLDER_MAPPINGS.values():
+    for path in config.folder_mappings.values():
         output_path = os.path.join(path, safe_filename)
         if os.path.exists(output_path):
             logging.info(f"File already exists locally: {safe_filename}")
@@ -121,12 +79,12 @@ def should_process_file(file_id, file_name, processed_files):
     return True
 
 def main():
-    stats = SyncStats()
+    stats = FetchStats()
     try:
-        logging.info("Starting transcript sync")
+        logging.info("Starting fetch")
         processed_files = file_processor.load_processed_files()
 
-        for folder_id, download_path in FOLDER_MAPPINGS.items():
+        for folder_id, download_path in config.folder_mappings.items():
             logging.info(f"Processing folder: {folder_id}")
 
             files = drive_client.list_files(folder_id)
@@ -198,12 +156,12 @@ def main():
                     continue
 
     except Exception as e:
-        logging.error(f"Error in main sync process: {e}", exc_info=True)
+        logging.error(f"Error in fetch process: {e}", exc_info=True)
         stats.errors += 1
         # Don't re-raise the error - let the script continue running
 
     logging.info(stats.get_summary())
-    logging.info("Sync completed")
+    logging.info("Fetch completed")
 
 if __name__ == '__main__':
     main()
