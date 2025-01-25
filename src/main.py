@@ -4,12 +4,7 @@ Google Drive text file fetcher
 See README
 """
 
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
 import os
-from googleapiclient.http import MediaIoBaseDownload
-from googleapiclient.errors import HttpError
-import io
 from datetime import datetime
 import logging
 from logging.handlers import RotatingFileHandler
@@ -21,6 +16,7 @@ import yaml
 from date_parser import parse_date_from_filename
 from state import FileProcessor
 from content import ContentFormatter
+from drive import DriveClient
 
 # Suppress oauth warning
 warnings.filterwarnings('ignore', message='file_cache is only supported with oauth2client<4.0.0')
@@ -43,6 +39,9 @@ file_processor = FileProcessor(STATE_FILE)
 
 # Create content formatter
 content_formatter = ContentFormatter()
+
+# Create drive client
+drive_client = DriveClient(CREDENTIALS_PATH)
 
 # Get folder mappings from config
 FOLDER_MAPPINGS = {
@@ -127,25 +126,10 @@ def main():
         logging.info("Starting transcript sync")
         processed_files = file_processor.load_processed_files()
 
-        credentials = service_account.Credentials.from_service_account_file(
-            CREDENTIALS_PATH,
-            scopes=['https://www.googleapis.com/auth/drive.readonly']
-        )
-
-        service = build('drive', 'v3', credentials=credentials)
-
         for folder_id, download_path in FOLDER_MAPPINGS.items():
             logging.info(f"Processing folder: {folder_id}")
 
-            query = f"'{folder_id}' in parents and (name contains 'Transcript' and (mimeType = 'application/vnd.google-apps.document' or mimeType = 'text/markdown'))"
-
-            results = service.files().list(
-                q=query,
-                orderBy='createdTime desc',
-                fields="files(id, name, mimeType)"
-            ).execute()
-
-            files = results.get('files', [])
+            files = drive_client.list_files(folder_id)
 
             if not files:
                 logging.info(f'No transcript files found in folder {folder_id}')
@@ -182,30 +166,12 @@ def main():
                     output_path = os.path.join(download_path, safe_filename)
 
                     try:
-                        # Download based on mime type
-                        if file.get('mimeType') == 'text/markdown':
-                            request = service.files().get_media(fileId=file_id)
-                        else:
-                            request = service.files().export_media(
-                                fileId=file_id,
-                                mimeType='text/markdown'
-                            )
-                        fh = io.BytesIO()
-                        downloader = MediaIoBaseDownload(fh, request)
-                        done = False
-                        while done is False:
-                            status, done = downloader.next_chunk()
-                            logging.info(f"Download progress: {int(status.progress() * 100)}%")
-                    except HttpError as e:
-                        if "Failed to establish a new connection" in str(e) or "Connection refused" in str(e) or "Unable to find the server" in str(e):
-                            logging.error(f"Network connectivity issue while processing {file_name}: {e}")
-                        else:
-                            logging.error(f"Google API error processing file {file_name}: {e}")
+                        content = drive_client.download_file(file_id, file.get('mimeType'))
+                    except Exception as e:
+                        logging.error(f"Error downloading file {file_name}: {e}")
                         stats.errors += 1
                         continue
 
-                    # Get content and add our header
-                    content = fh.getvalue().decode('utf-8')
                     final_content = content_formatter.create_note_content(content, file_name, folder_id)
 
                     try:
