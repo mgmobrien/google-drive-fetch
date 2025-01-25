@@ -18,7 +18,8 @@ import warnings
 import time
 import re
 import yaml
-from date_parser import parse_date_from_filename  # New import
+from date_parser import parse_date_from_filename
+from state import FileProcessor
 
 # Suppress oauth warning
 warnings.filterwarnings('ignore', message='file_cache is only supported with oauth2client<4.0.0')
@@ -35,6 +36,9 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOG_DIR = os.path.join(BASE_DIR, 'logs')
 STATE_FILE = os.path.join(BASE_DIR, 'state', 'processed_files.json')
 CREDENTIALS_PATH = os.path.join(BASE_DIR, config['credentials']['service_account_path'])
+
+# Create file processor
+file_processor = FileProcessor(STATE_FILE)
 
 # Get folder mappings from config
 FOLDER_MAPPINGS = {
@@ -108,44 +112,10 @@ def should_process_file(file_id, file_name, processed_files):
                 'name': file_name,
                 'processed_at': datetime.now().isoformat()
             }
-            save_processed_files(processed_files)
+            file_processor.save_processed_files(processed_files)
             return False
 
     return True
-
-def load_processed_files():
-    """Load state file with retry logic for potential race conditions"""
-    max_retries = 3
-    retry_delay = 0.1  # seconds
-
-    for attempt in range(max_retries):
-        try:
-            if os.path.exists(STATE_FILE):
-                with open(STATE_FILE, 'r') as f:
-                    content = f.read().strip()
-                    if not content:
-                        return {}
-                    return json.loads(content)
-            return {}
-        except (json.JSONDecodeError, IOError) as e:
-            if attempt == max_retries - 1:  # Last attempt
-                logging.error(f"Error reading state file after {max_retries} attempts: {e}")
-                return {}
-            time.sleep(retry_delay)
-            continue
-
-def save_processed_files(processed):
-    """Safely write state file using atomic write pattern"""
-    temp_file = STATE_FILE + '.tmp'
-    try:
-        with open(temp_file, 'w') as f:
-            json.dump(processed, f, indent=2)  # Added indent for readability
-        os.replace(temp_file, STATE_FILE)  # Atomic operation
-    except Exception as e:
-        logging.error(f"Error saving state file: {e}")
-        if os.path.exists(temp_file):
-            os.remove(temp_file)
-        raise
 
 def create_note_content(original_content, file_name, folder_id):
     timestamp = datetime.now().strftime("%Y-%m-%d %H.%M.%S")
@@ -179,7 +149,7 @@ def main():
     stats = SyncStats()
     try:
         logging.info("Starting transcript sync")
-        processed_files = load_processed_files()
+        processed_files = file_processor.load_processed_files()
 
         credentials = service_account.Credentials.from_service_account_file(
             CREDENTIALS_PATH,
@@ -277,7 +247,7 @@ def main():
                         'name': file_name,
                         'processed_at': datetime.now().isoformat()
                     }
-                    save_processed_files(processed_files)
+                    file_processor.save_processed_files(processed_files)
                     stats.files_processed += 1
 
                 except Exception as e:
