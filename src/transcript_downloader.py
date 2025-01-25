@@ -17,21 +17,28 @@ import json
 import warnings
 import time
 import re
+import yaml
 
 # Suppress oauth warning
 warnings.filterwarnings('ignore', message='file_cache is only supported with oauth2client<4.0.0')
 
-# Set up base directory and paths
-BASE_DIR = '/Users/mattobrien/Development/google-drive-fetcher'
-LOG_DIR = f'{BASE_DIR}/logs'
-STATE_FILE = f'{BASE_DIR}/state/processed_files.json'
-CREDENTIALS_PATH = f'{BASE_DIR}/credentials/transcript-syncer-131b6cd620c8.json'
+# Load config
+try:
+    with open('config.yaml', 'r') as f:
+        config = yaml.safe_load(f)
+except FileNotFoundError:
+    raise FileNotFoundError("config.yaml not found. Please copy config.example.yaml to config.yaml and update with your settings.")
 
+# Set up base directory and paths
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LOG_DIR = os.path.join(BASE_DIR, 'logs')
+STATE_FILE = os.path.join(BASE_DIR, 'state', 'processed_files.json')
+CREDENTIALS_PATH = os.path.join(BASE_DIR, config['credentials']['service_account_path'])
+
+# Get folder mappings from config
 FOLDER_MAPPINGS = {
-    "1FD_UfXJ1gjOmFrjudnuMfrQ15On2JsMS": "/Users/mattobrien/Obsidian Main Vault/ObsidianVault/Catchall transcripts",  # Catch-all
-    "108_9MeB539PK6NVEjgARZuQKfms_PPt0": "/Users/mattobrien/Obsidian Main Vault/ObsidianVault/-No Instructions/User testing/Transcripts",  # Customer Calls
-    "1FsPM-xB7EH6Fc2CCu67EHDhYMotx0EYc": "/Users/mattobrien/Obsidian Main Vault/ObsidianVault/Oceano/Principals/Dragon/=Dragon & Matt/Transcripts",  # Dragon
-    "1EiScFFGiE6hdKBOZeSicnO_lxv2U3mcB": "/Users/mattobrien/Obsidian Main Vault/ObsidianVault/-No Instructions/Dan Matt/Transcripts",  # Meetings
+    folder_config['google_drive_id']: folder_config['local_path']
+    for folder_config in config['folders'].values()
 }
 
 class SyncStats:
@@ -117,6 +124,17 @@ def parse_date_from_filename(file_name):
             return datetime.strptime(date_str, "%Y/%m/%d")
     except Exception as e:
         logging.debug(f"Third format parse failed: {e}")
+        pass
+
+    # Try Dragon format: "Dragon & Matt - 2023/10/31"
+    try:
+        match = re.search(r'Dragon & Matt - (\d{4}/\d{2}/\d{2})', normalized_name)
+        if match:
+            date_str = match.group(1)
+            logging.debug(f"Dragon format matched date: {date_str}")
+            return datetime.strptime(date_str, "%Y/%m/%d")
+    except Exception as e:
+        logging.debug(f"Dragon format parse failed: {e}")
         pass
 
     logging.warning(f"Could not parse date from filename: {file_name}")
@@ -224,7 +242,7 @@ def main():
         for folder_id, download_path in FOLDER_MAPPINGS.items():
             logging.info(f"Processing folder: {folder_id}")
 
-            query = f"'{folder_id}' in parents and name contains 'Transcript' and mimeType = 'application/vnd.google-apps.document'"
+            query = f"'{folder_id}' in parents and (name contains 'Transcript' and (mimeType = 'application/vnd.google-apps.document' or mimeType = 'text/markdown'))"
 
             results = service.files().list(
                 q=query,
@@ -269,11 +287,14 @@ def main():
                     output_path = os.path.join(download_path, safe_filename)
 
                     try:
-                        # Download markdown version
-                        request = service.files().export_media(
-                            fileId=file_id,
-                            mimeType='text/markdown'
-                        )
+                        # Download based on mime type
+                        if file.get('mimeType') == 'text/markdown':
+                            request = service.files().get_media(fileId=file_id)
+                        else:
+                            request = service.files().export_media(
+                                fileId=file_id,
+                                mimeType='text/markdown'
+                            )
                         fh = io.BytesIO()
                         downloader = MediaIoBaseDownload(fh, request)
                         done = False
