@@ -1,5 +1,5 @@
 """
-Google Drive text file fetcher
+Google Drive file fetcher
 ----------------
 See README
 """
@@ -33,30 +33,6 @@ drive_client = DriveClient(config.credentials_path)
 # Set up logging
 logger = setup_logging(config.log_dir)
 
-def should_process_file(file_id, file_name, processed_files):
-    # Skip if in state file
-    if file_id in processed_files:
-        return False
-
-    date_obj = parse_date_from_filename(file_name)
-    file_date = date_obj.strftime("%Y-%m-%d")
-
-    # Skip if file already exists in any of the folders
-    safe_filename = f"TS. {file_date} - {file_name.replace('/', '-').replace(':', '-')}.md"
-    for path in config.folder_mappings.values():
-        output_path = os.path.join(path, safe_filename)
-        if os.path.exists(output_path):
-            logger.info(f"File already exists locally: {safe_filename}")
-            # Add to state file so we don't check again
-            processed_files[file_id] = {
-                'name': file_name,
-                'processed_at': datetime.now().isoformat()
-            }
-            file_processor.save_processed_files(processed_files)
-            return False
-
-    return True
-
 def main():
     stats = FetchStats()
     try:
@@ -88,7 +64,7 @@ def main():
                         stats.errors += 1
                         continue
 
-                    if not should_process_file(file_id, file_name, processed_files):
+                    if not file_processor.should_process_file(file_id, file_name, config.folder_mappings):
                         logger.info(f"Skipping file: {file_name}")
                         stats.files_skipped += 1
                         continue
