@@ -1,3 +1,60 @@
-Updated: Context is now at
-`/Users/mattobrien/Obsidian Main Vault/ObsidianVault/AI-context/Transcript/Context. Transcript Syncer.md
-`
+# Google Drive Fetch
+
+Automatically fetches text documents (Google Docs and .md) from Google Drive folders and saves them as markdown files in specified local directories. Built primarily for syncing meeting transcripts to Obsidian vaults.
+
+## Features
+
+- One-way sync from Google Drive to local directories
+- Supports both Google Docs and markdown files
+- Handles multiple folder mappings
+- Adds configurable front matter/headers to files
+- Maintains sync state to avoid duplicates
+- Date parsing from various filename formats
+
+## Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/mgmobrien/google-drive-fetch.git
+cd google-drive-fetch
+```
+
+2. Install dependencies:
+```bash
+pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client pyyaml
+```
+
+## Configuration
+
+1. Copy the example config file:
+```bash
+cp config.example.yaml config.yaml
+```
+
+2. Set up Google Cloud Project and credentials:
+   - Create a new project in Google Cloud Console
+   - Enable the Google Drive API
+   - Create a service account
+   - Download the service account key
+   - Copy to `credentials/service-account.json`
+
+3. Update `config.yaml` with your folder mappings:
+```yaml
+folders:
+  folder_name:
+    google_drive_id: "your-folder-id"
+    local_path: "/path/to/local/folder"
+```
+
+## Usage
+
+Run the script:
+```bash
+python src/transcript_downloader.py
+```
+
+For automated running, set up using your system's scheduler (launchd, cron, etc.)
+
+## License
+
+MIT
