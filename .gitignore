@@ -17,3 +17,9 @@ __pycache__/
 .DS_Store
 
 .ropeproject/
+
+# Utility scripts
+filter_dragon_transcripts.py
+
+# Local configuration files
+launchd/com.mattobrien.transcriptsyncer.plist
